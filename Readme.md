@@ -29,10 +29,8 @@ I don't intend for this to be a GUI desktop client. There's not a lot of code ov
 
 ##Plans
 
-* Basic auth
-
-* Parse a user config file?
+* Replace with MQTT
 
 * Updating HA state directly via web API (means we need to know HA location and auth)
 
-* Make it discoverable on the HA side. (might mean a new component on the HA side). Might be needed to handle DHCP properly.
+* Make it discoverable on the HA side.
