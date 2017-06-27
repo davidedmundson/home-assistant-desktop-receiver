@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Home Assistant Desktop Receiver
+Exec=home-assistant-desktop-receiver
+Terminal=false
+Type=Application
+#NotShowIn=GNOME;XFCE;LXDE;KDE;
+StartupNotify=true

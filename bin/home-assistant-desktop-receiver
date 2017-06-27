@@ -1,0 +1,77 @@
+#!/bin/env python3
+import http.server
+import socketserver
+from urllib import parse
+import dbus
+
+PORT = 8124
+
+#rather than just basing it off lock state, assume we're not active if unused for n minutes
+#set to 0 to disable
+IDLE_TIMEOUT = 1 #in minutes
+
+IDLE_TIMEOUT_MS = IDLE_TIMEOUT * 60 * 1000
+
+session_bus = dbus.SessionBus()
+
+class HomeAssistantIntegrator(http.server.BaseHTTPRequestHandler):
+    def reply(s, value):
+        s.send_response(200)
+        s.send_header("Content-type", "text/plain")
+        s.end_headers()
+        response = b"0"
+        if value:
+            response = b"1"
+        s.wfile.write(response)
+
+    def error(s):
+        s.send_response(403)
+        s.end_headers()
+
+    def do_GET(s):
+        url = parse.urlparse(s.path)
+        endpoint = url.path
+        query = parse.parse_qs(url.query)
+        if endpoint == "/notifications":
+            message = query["message"][0]
+            print(message)
+            try:
+                notify_obj = session_bus.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
+                notify_obj.Notify(
+                    "homeassistant", #app name
+                    0, #replaces (0 = not relevant)
+                    "", #icon name / path
+                    "Home Assistant", # title
+                    message, # body
+                    [], # actions
+                    {}, #hints
+                    0, #timeout. 0 = indefinite
+                    dbus_interface="org.freedesktop.Notifications")
+                s.reply(True)
+            except:
+                s.reply(False)
+                print("Could not send notification")
+        elif endpoint == "/isActive":
+            is_active = True # we received the message, we're half alive at least
+
+            #test if screen saver is active, if so we're definitely inactive
+            #if not, see if we've been idle for longer than the timeout
+            try:
+                screensaver = session_bus.get_object("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver")
+                is_active = not screensaver.GetActive() # negated, as we're active if the screensaver isn't
+                if is_active and IDLE_TIMEOUT_MS > 0:
+                    print ("Checking idle time %d %d" % (screensaver.GetSessionIdleTime() ,IDLE_TIMEOUT_MS))
+                    is_active = screensaver.GetSessionIdleTime() < IDLE_TIMEOUT_MS
+
+            except:
+                print("Could not determine session state. Assuming active")
+            s.reply(is_active)
+
+        else:
+            s.error()
+
+if __name__ == '__main__':
+    httpd = socketserver.TCPServer(("", PORT), HomeAssistantIntegrator)
+    print("serving at port", PORT)
+    httpd.serve_forever()
+
